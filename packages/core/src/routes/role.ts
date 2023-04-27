@@ -1,7 +1,7 @@
-import type { RoleResponse } from '@logto/schemas';
-import { userInfoSelectFields, Roles } from '@logto/schemas';
+import { type RoleResponse, Users, userInfoSelectFields, Roles } from '@logto/schemas';
 import { generateStandardId } from '@logto/shared';
 import { pick, tryThat } from '@silverhand/essentials';
+import compose from 'koa-compose';
 import { object, string, z } from 'zod';
 
 import RequestError from '#src/errors/RequestError/index.js';
@@ -41,50 +41,57 @@ export default function roleRoutes<T extends AuthedRouter>(
 
   router.use('/roles(/.*)?', koaRoleRlsErrorHandler());
 
-  router.get('/roles', koaPagination(), async (ctx, next) => {
-    const { limit, offset } = ctx.pagination;
-    const { searchParams } = ctx.request.URL;
+  router.get(
+    '/roles',
+    compose([koaGuard({ response: z.array(Roles.guard), status: 200 }), koaPagination()]),
+    async (ctx, next) => {
+      const { limit, offset } = ctx.pagination;
+      const { searchParams } = ctx.request.URL;
 
-    return tryThat(
-      async () => {
-        const search = parseSearchParamsForSearch(searchParams);
-        const excludeUserId = searchParams.get('excludeUserId');
-        const usersRoles = excludeUserId ? await findUsersRolesByUserId(excludeUserId) : [];
-        const excludeRoleIds = usersRoles.map(({ roleId }) => roleId);
+      return tryThat(
+        async () => {
+          const search = parseSearchParamsForSearch(searchParams);
+          const excludeUserId = searchParams.get('excludeUserId');
+          const usersRoles = excludeUserId ? await findUsersRolesByUserId(excludeUserId) : [];
+          const excludeRoleIds = usersRoles.map(({ roleId }) => roleId);
 
-        const [{ count }, roles] = await Promise.all([
-          countRoles(search, { excludeRoleIds }),
-          findRoles(search, limit, offset, { excludeRoleIds }),
-        ]);
+          const [{ count }, roles] = await Promise.all([
+            countRoles(search, { excludeRoleIds }),
+            findRoles(search, limit, offset, { excludeRoleIds }),
+          ]);
 
-        const rolesResponse: RoleResponse[] = await Promise.all(
-          roles.map(async (role) => {
-            const { count } = await countUsersRolesByRoleId(role.id);
-            const usersRoles = await findUsersRolesByRoleId(role.id, 3);
-            const users = await findUsersByIds(usersRoles.map(({ userId }) => userId));
+          const rolesResponse: RoleResponse[] = await Promise.all(
+            roles.map(async (role) => {
+              const { count } = await countUsersRolesByRoleId(role.id);
+              const usersRoles = await findUsersRolesByRoleId(role.id, 3);
+              const users = await findUsersByIds(usersRoles.map(({ userId }) => userId));
 
-            return {
-              ...role,
-              usersCount: count,
-              featuredUsers: users.map(({ id, avatar, name }) => ({ id, avatar, name })),
-            };
-          })
-        );
+              return {
+                ...role,
+                usersCount: count,
+                featuredUsers: users.map(({ id, avatar, name }) => ({ id, avatar, name })),
+              };
+            })
+          );
 
-        // Return totalCount to pagination middleware
-        ctx.pagination.totalCount = count;
-        ctx.body = rolesResponse;
+          // Return totalCount to pagination middleware
+          ctx.pagination.totalCount = count;
+          ctx.body = rolesResponse;
 
-        return next();
-      },
-      (error) => {
-        if (error instanceof TypeError) {
-          throw new RequestError({ code: 'request.invalid_input', details: error.message }, error);
+          return next();
+        },
+        (error) => {
+          if (error instanceof TypeError) {
+            throw new RequestError(
+              { code: 'request.invalid_input', details: error.message },
+              error
+            );
+          }
+          throw error;
         }
-        throw error;
-      }
-    );
-  });
+      );
+    }
+  );
 
   router.post(
     '/roles',
@@ -92,6 +99,8 @@ export default function roleRoutes<T extends AuthedRouter>(
       body: Roles.createGuard
         .omit({ id: true })
         .extend({ scopeIds: z.string().min(1).array().optional() }),
+      response: Roles.guard,
+      status: 200,
     }),
     async (ctx, next) => {
       const { body } = ctx.guard;
@@ -128,6 +137,8 @@ export default function roleRoutes<T extends AuthedRouter>(
     '/roles/:id',
     koaGuard({
       params: object({ id: string().min(1) }),
+      response: Roles.guard,
+      status: 200,
     }),
     async (ctx, next) => {
       const {
@@ -145,6 +156,8 @@ export default function roleRoutes<T extends AuthedRouter>(
     koaGuard({
       body: Roles.createGuard.pick({ name: true, description: true }).partial(),
       params: object({ id: string().min(1) }),
+      response: Roles.guard,
+      status: 200,
     }),
     async (ctx, next) => {
       const {
@@ -172,6 +185,7 @@ export default function roleRoutes<T extends AuthedRouter>(
     '/roles/:id',
     koaGuard({
       params: object({ id: string().min(1) }),
+      status: 204,
     }),
     async (ctx, next) => {
       const {
@@ -189,6 +203,10 @@ export default function roleRoutes<T extends AuthedRouter>(
     koaPagination(),
     koaGuard({
       params: object({ id: string().min(1) }),
+      response: Users.guard.pick(
+        Object.fromEntries(userInfoSelectFields.map((field) => [field, true]))
+      ),
+      status: 200,
     }),
     async (ctx, next) => {
       const {
@@ -233,6 +251,7 @@ export default function roleRoutes<T extends AuthedRouter>(
     koaGuard({
       params: object({ id: string().min(1) }),
       body: object({ userIds: string().min(1).array() }),
+      status: 201,
     }),
     async (ctx, next) => {
       const {
@@ -265,6 +284,7 @@ export default function roleRoutes<T extends AuthedRouter>(
     '/roles/:id/users/:userId',
     koaGuard({
       params: object({ id: string().min(1), userId: string().min(1) }),
+      status: 204,
     }),
     async (ctx, next) => {
       const {
