@@ -1,4 +1,4 @@
-import type { Hook, LogKey } from '@logto/schemas';
+import type { Hook, HookConfig, LogKey } from '@logto/schemas';
 import { HookEvent, SignInIdentifier, LogResult, InteractionEvent } from '@logto/schemas';
 
 import { authedAdminApi, deleteUser, getLogs, putInteraction } from '#src/api/index.js';
@@ -8,8 +8,13 @@ import { enableAllPasswordSignInMethods } from '#src/helpers/sign-in-experience.
 import { generateNewUser, generateNewUserProfile } from '#src/helpers/user.js';
 import { waitFor } from '#src/utils.js';
 
-const createPayload = (event: HookEvent, url = 'not_work_url'): Partial<Hook> => ({
-  event,
+type CreateHookPayload = Pick<Hook, 'name' | 'events'> & {
+  config: HookConfig;
+};
+
+const createPayload = (event: HookEvent, url = 'not_work_url'): CreateHookPayload => ({
+  name: 'hook_name',
+  events: [event],
   config: {
     url,
     headers: { foo: 'bar' },
@@ -36,16 +41,15 @@ describe('hooks', () => {
     const payload = createPayload(HookEvent.PostRegister);
     const created = await authedAdminApi.post('hooks', { json: payload }).json<Hook>();
 
-    expect(payload.event).toEqual(created.event);
-    expect(payload.config).toEqual(created.config);
+    expect(created).toMatchObject(payload);
 
     expect(await authedAdminApi.get('hooks').json<Hook[]>()).toContainEqual(created);
     expect(await authedAdminApi.get(`hooks/${created.id}`).json<Hook>()).toEqual(created);
     expect(
       await authedAdminApi
-        .patch(`hooks/${created.id}`, { json: { event: HookEvent.PostSignIn } })
+        .patch(`hooks/${created.id}`, { json: { events: [HookEvent.PostSignIn] } })
         .json<Hook>()
-    ).toEqual({ ...created, event: HookEvent.PostSignIn });
+    ).toMatchObject({ ...created, events: [HookEvent.PostSignIn] });
     expect(await authedAdminApi.delete(`hooks/${created.id}`)).toHaveProperty('statusCode', 204);
     await expect(authedAdminApi.get(`hooks/${created.id}`)).rejects.toHaveProperty(
       'response.statusCode',
