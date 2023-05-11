@@ -55,7 +55,7 @@ export default function hookRoutes<T extends AuthedRouter>(
       status: [200, 422],
     }),
     async (ctx, next) => {
-      const { name, event, events, ...rest } = ctx.guard.body;
+      const { name, event, events, config, ...rest } = ctx.guard.body;
 
       const hasConflictEventFields = event && events;
       assertThat(
@@ -79,6 +79,10 @@ export default function hookRoutes<T extends AuthedRouter>(
         events: eventsToCreate,
         signingKey: generateStandardId(),
         enabled: true,
+        config: {
+          ...config,
+          retries: config.retries ?? 3,
+        },
       });
 
       return next();
