@@ -134,7 +134,10 @@ describe('hooks', () => {
       // Using the old API to create a hook
       authedAdminApi
         .post('hooks', {
-          json: { event: HookEvent.PostRegister, config: { url: 'not_work_url', retries: 2 } },
+          json: {
+            event: HookEvent.PostRegister,
+            config: { url: 'http://localhost:9999', retries: 2 },
+          },
         })
         .json<Hook>(),
     ]);
