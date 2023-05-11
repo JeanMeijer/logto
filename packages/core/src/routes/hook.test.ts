@@ -128,6 +128,7 @@ describe('hook routes', () => {
       event: HookEvent.PostRegister,
       config: {
         url: 'https://example.com',
+        retries: 2,
       },
     };
     const response = await hookRequest.post('/hooks').send(payload);
@@ -141,6 +142,7 @@ describe('hook routes', () => {
       events: [HookEvent.PostRegister],
       config: {
         url: 'https://example.com',
+        retries: 2,
       },
     });
   });
@@ -192,12 +194,20 @@ describe('hook routes', () => {
 
   it('PATCH /hooks/:id should success when update a hook with the old payload format', async () => {
     const event = HookEvent.PostSignIn;
-    const response = await hookRequest.patch(`/hooks/${mockNanoIdForHook}`).send({ event });
+    const response = await hookRequest.patch(`/hooks/${mockNanoIdForHook}`).send({
+      event,
+      config: {
+        retries: 1,
+      },
+    });
 
     expect(response.status).toEqual(200);
     expect(response.body).toMatchObject({
       event,
       events: [event],
+      config: {
+        retries: 1,
+      },
     });
   });
 

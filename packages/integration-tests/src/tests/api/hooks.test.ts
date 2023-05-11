@@ -57,6 +57,36 @@ describe('hooks', () => {
     );
   });
 
+  it('should be able to create, query, update, and delete a hook by the original API', async () => {
+    const payload = {
+      event: HookEvent.PostRegister,
+      config: {
+        url: 'not_work_url',
+        retries: 2,
+      },
+    };
+    const created = await authedAdminApi.post('hooks', { json: payload }).json<Hook>();
+
+    expect(created).toMatchObject(payload);
+
+    expect(await authedAdminApi.get('hooks').json<Hook[]>()).toContainEqual(created);
+    expect(await authedAdminApi.get(`hooks/${created.id}`).json<Hook>()).toEqual(created);
+    expect(
+      await authedAdminApi
+        .patch(`hooks/${created.id}`, { json: { event: HookEvent.PostSignIn } })
+        .json<Hook>()
+    ).toMatchObject({
+      ...created,
+      event: HookEvent.PostSignIn,
+      events: [HookEvent.PostSignIn],
+    });
+    expect(await authedAdminApi.delete(`hooks/${created.id}`)).toHaveProperty('statusCode', 204);
+    await expect(authedAdminApi.get(`hooks/${created.id}`)).rejects.toHaveProperty(
+      'response.statusCode',
+      404
+    );
+  });
+
   it('should trigger sign-in hook and record error when interaction finished', async () => {
     const createdHook = await authedAdminApi
       .post('hooks', { json: createPayload(HookEvent.PostSignIn) })
@@ -96,10 +126,16 @@ describe('hooks', () => {
   });
 
   it('should trigger multiple register hooks and record properly when interaction finished', async () => {
-    const [hook1, hook2] = await Promise.all([
+    const [hook1, hook2, hook3] = await Promise.all([
       authedAdminApi.post('hooks', { json: createPayload(HookEvent.PostRegister) }).json<Hook>(),
       authedAdminApi
         .post('hooks', { json: createPayload(HookEvent.PostRegister, 'http://localhost:9999') })
+        .json<Hook>(),
+      // Using the old API to create a hook
+      authedAdminApi
+        .post('hooks', {
+          json: { event: HookEvent.PostRegister, config: { url: 'not_work_url', retries: 2 } },
+        })
         .json<Hook>(),
     ]);
     const logKey: LogKey = 'TriggerHook.PostRegister';
@@ -131,11 +167,17 @@ describe('hooks', () => {
         ({ payload: { hookId, result } }) => hookId === hook2.id && result === LogResult.Success
       )
     ).toBeTruthy();
+    expect(
+      logs.some(
+        ({ payload: { hookId, result } }) => hookId === hook3.id && result === LogResult.Success
+      )
+    ).toBeTruthy();
 
     // Clean up
     await Promise.all([
       authedAdminApi.delete(`hooks/${hook1.id}`),
       authedAdminApi.delete(`hooks/${hook2.id}`),
+      authedAdminApi.delete(`hooks/${hook3.id}`),
     ]);
     await deleteUser(id);
   });
