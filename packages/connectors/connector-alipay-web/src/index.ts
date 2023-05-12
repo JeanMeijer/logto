@@ -125,6 +125,8 @@ const getUserInfo =
       ...config,
     };
     const signedSearchParameters = signingParameters(initSearchParameters);
+    console.log('initSearchParameters:', initSearchParameters);
+    console.log('signedSearchParameters:', signedSearchParameters);
 
     const httpResponse = await got.post(alipayEndpoint, {
       searchParams: signedSearchParameters,
@@ -136,9 +138,11 @@ const getUserInfo =
     const result = userInfoResponseGuard.safeParse(parseJson(rawBody));
 
     if (!result.success) {
+      console.log('fail to parse httpResponse rawBody:', rawBody);
       throw new ConnectorError(ConnectorErrorCodes.InvalidResponse, result.error);
     }
 
+    console.log('parsed response:', result.data);
     const { alipay_user_info_share_response } = result.data;
 
     errorHandler(alipay_user_info_share_response);
