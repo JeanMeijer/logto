@@ -115,6 +115,19 @@ describe('hooks', () => {
     );
   });
 
+  it('should throw error when update a hook with both event and events', async () => {
+    const payload = createPayload(HookEvent.PostRegister);
+    const created = await authedAdminApi.post('hooks', { json: payload }).json<Hook>();
+
+    expect(created).toMatchObject(payload);
+
+    await expect(
+      authedAdminApi.patch(`hooks/${created.id}`, {
+        json: { event: HookEvent.PostSignIn, events: [HookEvent.PostResetPassword] },
+      })
+    ).rejects.toMatchObject(createResponseWithCode(422));
+  });
+
   it('should throw error when no event is provided when creating a hook', async () => {
     const payload = {
       name: 'hook_name',

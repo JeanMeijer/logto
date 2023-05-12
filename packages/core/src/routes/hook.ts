@@ -122,7 +122,7 @@ export default function hookRoutes<T extends AuthedRouter>(
           events: hookEventsGuard.nonempty().optional(),
         }),
       response: Hooks.guard,
-      status: [200, 404],
+      status: [200, 404, 422],
     }),
     async (ctx, next) => {
       const {
