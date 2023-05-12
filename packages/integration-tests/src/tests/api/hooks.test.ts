@@ -2,6 +2,7 @@ import type { Hook, HookConfig, LogKey } from '@logto/schemas';
 import { HookEvent, SignInIdentifier, LogResult, InteractionEvent } from '@logto/schemas';
 
 import { authedAdminApi, deleteUser, getLogs, putInteraction } from '#src/api/index.js';
+import { createResponseWithCode } from '#src/helpers/admin-tenant.js';
 import { initClient, processSession } from '#src/helpers/client.js';
 import { createMockServer } from '#src/helpers/index.js';
 import { enableAllPasswordSignInMethods } from '#src/helpers/sign-in-experience.js';
@@ -84,6 +85,45 @@ describe('hooks', () => {
     await expect(authedAdminApi.get(`hooks/${created.id}`)).rejects.toHaveProperty(
       'response.statusCode',
       404
+    );
+  });
+
+  it('should throw error when creating a hook with both event and events', async () => {
+    const payload = {
+      name: 'hook_name',
+      event: HookEvent.PostRegister,
+      events: [HookEvent.PostSignIn, HookEvent.PostResetPassword],
+      config: {
+        url: 'not_work_url',
+      },
+    };
+    await expect(authedAdminApi.post('hooks', { json: payload })).rejects.toMatchObject(
+      createResponseWithCode(422)
+    );
+  });
+
+  it('should throw error when creating a hook with an empty hook name', async () => {
+    const payload = {
+      name: '',
+      events: [HookEvent.PostRegister],
+      config: {
+        url: 'not_work_url',
+      },
+    };
+    await expect(authedAdminApi.post('hooks', { json: payload })).rejects.toMatchObject(
+      createResponseWithCode(400)
+    );
+  });
+
+  it('should throw error when no event is provided when creating a hook', async () => {
+    const payload = {
+      name: 'hook_name',
+      config: {
+        url: 'not_work_url',
+      },
+    };
+    await expect(authedAdminApi.post('hooks', { json: payload })).rejects.toMatchObject(
+      createResponseWithCode(422)
     );
   });
 
