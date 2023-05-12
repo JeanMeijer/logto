@@ -1,11 +1,11 @@
+import { jsonObjectGuard, type JsonObject } from '@logto/schemas';
 import { t } from 'i18next';
 
 export const safeParseJson = (
   jsonString: string
-): { success: true; data: unknown } | { success: false; error: string } => {
+): { success: true; data: JsonObject } | { success: false; error: string } => {
   try {
-    // eslint-disable-next-line no-restricted-syntax
-    const data = JSON.parse(jsonString) as unknown;
+    const data = jsonObjectGuard.parse(JSON.parse(jsonString));
 
     return { success: true, data };
   } catch {
