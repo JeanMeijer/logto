@@ -1,5 +1,13 @@
 # Change Log
 
+## 1.3.0
+
+### Patch Changes
+
+- 1642df7e1: add response schemas to swagger.json API
+  - @logto/schemas@1.3.0
+  - @logto/cli@1.3.0
+
 ## 1.2.3
 
 ### Patch Changes
